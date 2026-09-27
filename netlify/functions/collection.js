@@ -1,5 +1,14 @@
 const { getStore } = require('@netlify/blobs');
 
+function openStore() {
+  const siteID = process.env.BLOBS_SITE_ID;
+  const token = process.env.BLOBS_TOKEN;
+  if (siteID && token) {
+    return getStore({ name: 'stv-app', siteID, token });
+  }
+  return getStore('stv-app');
+}
+
 function resp(statusCode, obj) {
   return {
     statusCode,
@@ -13,7 +22,7 @@ exports.handler = async (event) => {
   if (!path) return resp(400, { error: 'missing path' });
   if (event.httpMethod !== 'GET') return resp(405, { error: 'method not allowed' });
 
-  const store = getStore('stv-app');
+  const store = openStore();
   const prefix = path.endsWith('/') ? path : path + '/';
 
   try {
