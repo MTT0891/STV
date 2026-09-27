@@ -1,5 +1,18 @@
 const { getStore } = require('@netlify/blobs');
 
+// Zero-config getStore() relies on Netlify injecting blobs context into the
+// function at deploy time — this doesn't always happen reliably. If that's
+// missing, fall back to explicit credentials from environment variables
+// (see README: "If you get MissingBlobsEnvironmentError").
+function openStore() {
+  const siteID = process.env.BLOBS_SITE_ID;
+  const token = process.env.BLOBS_TOKEN;
+  if (siteID && token) {
+    return getStore({ name: 'stv-app', siteID, token });
+  }
+  return getStore('stv-app');
+}
+
 function resp(statusCode, obj) {
   return {
     statusCode,
@@ -12,7 +25,7 @@ exports.handler = async (event) => {
   const path = event.queryStringParameters && event.queryStringParameters.path;
   if (!path) return resp(400, { error: 'missing path' });
 
-  const store = getStore('stv-app');
+  const store = openStore();
 
   try {
     if (event.httpMethod === 'GET') {
