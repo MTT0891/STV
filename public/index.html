@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ranked Choice: STV Election</title>
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --panel: #ffffff;
+    --ink: #1c1b1a;
+    --ink-dim: #6b6863;
+    --line: #e4e1db;
+    --accent: #b45309;
+    --accent-ink: #ffffff;
+    --accent-soft: #fdf1e2;
+    --good: #2f7a4f;
+    --good-soft: #e6f4ea;
+    --bad: #b3402f;
+    --bad-soft: #fbe9e5;
+    --radius: 14px;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #15130f;
+      --panel: #1f1c17;
+      --ink: #f2ede4;
+      --ink-dim: #a89f91;
+      --line: #34302a;
+      --accent: #e08a2e;
+      --accent-ink: #1c1200;
+      --accent-soft: #2e2214;
+      --good: #5fbf82;
+      --good-soft: #123322;
+      --bad: #e07a68;
+      --bad-soft: #331714;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #15130f;
+    --panel: #1f1c17;
+    --ink: #f2ede4;
+    --ink-dim: #a89f91;
+    --line: #34302a;
+    --accent: #e08a2e;
+    --accent-ink: #1c1200;
+    --accent-soft: #2e2214;
+    --good: #5fbf82;
+    --good-soft: #123322;
+    --bad: #e07a68;
+    --bad-soft: #331714;
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: ui-rounded, "Segoe UI", system-ui, -apple-system, sans-serif;
+    min-height: 100%;
+    -webkit-font-smoothing: antialiased;
+  }
+  * { box-sizing: border-box; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 24px 18px 48px; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; letter-spacing: -0.02em; }
+  h2 { font-size: 1.15rem; margin: 0 0 12px; letter-spacing: -0.01em; }
+  .sub { color: var(--ink-dim); font-size: 0.92rem; margin: 0 0 20px; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .col { display: flex; flex-direction: column; gap: 10px; }
+  button {
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--ink);
+    padding: 12px 18px;
+    cursor: pointer;
+    transition: transform 0.05s ease;
+  }
+  button:active { transform: scale(0.97); }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button.big { width: 100%; padding: 16px; font-size: 1.05rem; }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  button.ghost { background: transparent; }
+  input[type=text], input[type=number] {
+    font-family: inherit;
+    font-size: 1rem;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    color: var(--ink);
+    width: 100%;
+  }
+  .code-badge {
+    font-family: ui-monospace, monospace;
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-radius: 12px;
+    padding: 14px 10px;
+    text-align: center;
+    margin: 10px 0;
+  }
+  .pill {
+    display: inline-block;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .cand-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--bg);
+  }
+  .cand-row input { border: none; background: transparent; padding: 4px; }
+  .rank-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    margin-bottom: 8px;
+    background: var(--bg);
+  }
+  .rank-num {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--accent-ink);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.85rem; font-weight: 700; flex-shrink: 0;
+  }
+  .rank-item .name { flex: 1; font-weight: 600; }
+  .iconbtn { padding: 6px 10px; font-size: 0.85rem; }
+  .cand-pool-btn {
+    display: block; width: 100%; text-align: left;
+    padding: 12px 14px; margin-bottom: 8px;
+  }
+  .bar-row { margin: 10px 0; }
+  .bar-label { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px; }
+  .bar-track { height: 14px; border-radius: 7px; background: var(--line); overflow: hidden; }
+  .bar-fill { height: 100%; background: var(--accent); border-radius: 7px; transition: width 0.4s ease; }
+  .bar-fill.elected { background: var(--good); }
+  .bar-fill.eliminated { background: var(--bad); opacity: 0.6; }
+  .quota-line { border-top: 2px dashed var(--ink-dim); margin: 4px 0 10px; padding-top: 6px; font-size: 0.8rem; color: var(--ink-dim); }
+  .round-note {
+    padding: 10px 12px; border-radius: 10px; font-size: 0.88rem; margin-bottom: 12px;
+  }
+  .round-note.elect { background: var(--good-soft); color: var(--good); }
+  .round-note.eliminate { background: var(--bad-soft); color: var(--bad); }
+  .winners-list { list-style: none; padding: 0; margin: 0; }
+  .winners-list li {
+    padding: 12px 14px; border-radius: 10px; background: var(--good-soft); color: var(--good);
+    font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;
+  }
+  .footer-nav { display: flex; justify-content: space-between; margin-top: 18px; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+  .link { background: none; border: none; color: var(--accent); font-weight: 600; padding: 6px; cursor: pointer; text-decoration: underline; }
+  .center { text-align: center; }
+  .muted { color: var(--ink-dim); font-size: 0.85rem; }
+  .warn-box { background: var(--bad-soft); color: var(--bad); padding: 12px 14px; border-radius: 10px; font-size: 0.88rem; margin-bottom: 16px; }
+  .spinner { width: 22px; height: 22px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--accent); animation: spin 0.8s linear infinite; margin: 0 auto; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .stepper { display: flex; align-items: center; gap: 12px; }
+  .stepper button { width: 40px; height: 40px; padding: 0; font-size: 1.2rem; }
+  .stepper .val { font-size: 1.2rem; font-weight: 700; min-width: 30px; text-align: center; }
+</style>
+</head>
+<body>
+<div id="app" class="wrap"></div>
+
+<script>
+(function() {
+  'use strict';
+
+  const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  function makeCode() {
+    let s = '';
+    for (let i = 0; i < 5; i++) s += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+    return s;
+  }
+  function makeId() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return 'id-' + Math.random().toString(36).slice(2) + Date.now();
+  }
+  function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+  }
+
+  // ---------- STV counting ----------
+  function computeSTV(candidates, ballots, numWinners) {
+    const ids = candidates.map(c => c.id);
+    const nameOf = {};
+    candidates.forEach(c => nameOf[c.id] = c.name);
+    const totalBallots = ballots.length;
+    const quota = Math.floor(totalBallots / (numWinners + 1)) + 1;
+
+    const state = ballots.map(b => ({
+      ranking: (b.ranking || []).filter(id => ids.includes(id)),
+      weight: 1,
+      pointer: 0
+    }));
+
+    const active = new Set(ids);
+    const elected = [];
+    const eliminated = [];
+    const rounds = [];
+
+    function tally() {
+      const t = {};
+      active.forEach(id => t[id] = 0);
+      let exhausted = 0;
+      state.forEach(s => {
+        while (s.pointer < s.ranking.length && !active.has(s.ranking[s.pointer])) s.pointer++;
+        if (s.pointer < s.ranking.length) {
+          t[s.ranking[s.pointer]] += s.weight;
+        } else {
+          exhausted += s.weight;
+        }
+      });
+      return { t, exhausted };
+    }
+
+    let guard = 0;
+    while (elected.length < numWinners && active.size > 0 && guard < 200) {
+      guard++;
+      const remainingSeats = numWinners - elected.length;
+      if (active.size <= remainingSeats) {
+        const { t, exhausted } = tally();
+        const now = [...active].sort((a, b) => t[b] - t[a]);
+        rounds.push({ type: 'electremaining', tally: t, exhausted, quota, elected: now, names: nameOf });
+        now.forEach(id => { elected.push(id); active.delete(id); });
+        break;
+      }
+      const { t, exhausted } = tally();
+      let winner = null;
+      active.forEach(id => {
+        if (t[id] >= quota && (!winner || t[id] > t[winner])) winner = id;
+      });
+      if (winner) {
+        const votes = t[winner];
+        const surplus = Math.max(0, votes - quota);
+        const transferValue = votes > 0 ? surplus / votes : 0;
+        state.forEach(s => {
+          if (s.pointer < s.ranking.length && s.ranking[s.pointer] === winner) {
+            s.weight = s.weight * transferValue;
+          }
+        });
+        active.delete(winner);
+        elected.push(winner);
+        rounds.push({ type: 'elect', tally: t, exhausted, quota, winner, votes, surplus, transferValue, names: nameOf });
+      } else {
+        let loser = null;
+        active.forEach(id => {
+          if (!loser || t[id] < t[loser]) loser = id;
+        });
+        eliminated.push(loser);
+        active.delete(loser);
+        rounds.push({ type: 'eliminate', tally: t, exhausted, quota, loser, votes: t[loser], names: nameOf });
+      }
+    }
+    return { quota, rounds, elected, totalBallots };
+  }
+
+  // ---------- App state ----------
+  const S = {
+    db: null,
+    user: null,
+    dbReady: false,
+    role: null,        // 'teacher' | 'student'
+    code: null,
+    election: null,    // live doc data
+    ballots: [],        // live (teacher only)
+    unsubElection: null,
+    unsubBallots: null,
+    joinError: null,
+    ballotId: null,
+    myRanking: [],
+    submitted: false,
+    submitError: null,
+    creating: false,
+    writeError: null,
+  };
+
+  function render() { App(); }
+
+  // ---------- Persistence helpers ----------
+  function localKeyBallot(code) { return 'stv_ballot_' + code; }
+
+  // ---------- Backend adapter (Netlify Functions + Blobs) ----------
+  async function fetchJSON(method, url, body) {
+    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    if (body !== undefined) opts.body = JSON.stringify(body);
+    const res = await fetch(url, opts);
+    if (!res.ok) {
+      let t = '';
+      try { t = await res.text(); } catch (e) {}
+      throw new Error('HTTP ' + res.status + (t ? ' ' + t : ''));
+    }
+    return res.json();
+  }
+
+  function makeDocRef(path) {
+    return {
+      get: () => fetchJSON('GET', '/.netlify/functions/doc?path=' + encodeURIComponent(path))
+        .then(r => ({ exists: !!r.exists, data: () => r.data })),
+      set: (data) => fetchJSON('POST', '/.netlify/functions/doc?path=' + encodeURIComponent(path), data),
+      update: (data) => fetchJSON('PATCH', '/.netlify/functions/doc?path=' + encodeURIComponent(path), data),
+      onSnapshot: (next, err) => {
+        let stopped = false;
+        const poll = async () => {
+          if (stopped) return;
+          try {
+            const r = await fetchJSON('GET', '/.netlify/functions/doc?path=' + encodeURIComponent(path));
+            if (!stopped) next({ exists: !!r.exists, data: () => r.data });
+          } catch (e) {
+            if (err) err({ code: 'unavailable', message: String(e) });
+          }
+        };
+        poll();
+        const id = setInterval(poll, 2000);
+        return () => { stopped = true; clearInterval(id); };
+      },
+      collection: (sub) => makeCollectionRef(path + '/' + sub)
+    };
+  }
+
+  function makeCollectionRef(path) {
+    return {
+      get: () => fetchJSON('GET', '/.netlify/functions/collection?path=' + encodeURIComponent(path))
+        .then(r => ({ docs: r.docs.map(d => ({ id: d.id, data: () => d.data })) })),
+      onSnapshot: (next, err) => {
+        let stopped = false;
+        const poll = async () => {
+          if (stopped) return;
+          try {
+            const r = await fetchJSON('GET', '/.netlify/functions/collection?path=' + encodeURIComponent(path));
+            if (!stopped) next({ docs: r.docs.map(d => ({ id: d.id, data: () => d.data })) });
+          } catch (e) {
+            if (err) err({ code: 'unavailable', message: String(e) });
+          }
+        };
+        poll();
+        const id = setInterval(poll, 2000);
+        return () => { stopped = true; clearInterval(id); };
+      },
+      doc: (id) => makeDocRef(path + '/' + id)
+    };
+  }
+
+  async function setupCapabilities() {
+    // No claude.ai capability bridge here — talk to our own Netlify
+    // Functions + Blobs backend instead. Polls every 2s for live sync.
+    S.db = { doc: makeDocRef, collection: makeCollectionRef };
+    S.user = null;
+    S.dbReady = true;
+    render();
+  }
+
+  function subscribeElection(code) {
+    if (S.unsubElection) { S.unsubElection(); S.unsubElection = null; }
+    if (!S.db) return;
+    const ref = S.db.doc('elections/' + code);
+    S.unsubElection = ref.onSnapshot(
+      (snap) => {
+        S.election = snap.exists ? snap.data() : null;
+        render();
+      },
+      (err) => {
+        S.joinError = 'Connection issue (' + err.code + '). Try reloading.';
+        render();
+      }
+    );
+  }
+
+  function subscribeBallots(code) {
+    if (S.unsubBallots) { S.unsubBallots(); S.unsubBallots = null; }
+    if (!S.db) return;
+    const col = S.db.collection('elections/' + code + '/ballots');
+    S.unsubBallots = col.onSnapshot(
+      (qsnap) => {
+        S.ballots = qsnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        render();
+      },
+      () => {}
+    );
+  }
+
+  // ---------- Actions ----------
+  async function createElection() {
+    if (!S.db) return;
+    S.creating = true; render();
+    const code = makeCode();
+    const doc = {
+      code,
+      teacherId: null,
+      candidates: [{ id: makeId(), name: '' }, { id: makeId(), name: '' }],
+      numWinners: 1,
+      phase: 'setup',
+      revealedRound: -1,
+      rounds: [],
+      elected: [],
+      createdAt: new Date().toISOString()
+    };
+    try {
+      await S.db.doc('elections/' + code).set(doc);
+      S.role = 'teacher';
+      S.code = code;
+      S.writeError = null;
+      subscribeElection(code);
+      subscribeBallots(code);
+    } catch (e) {
+      S.writeError = 'Could not create the election (' + String(e.message || e) + '). Check that the site\'s functions are deployed.';
+    }
+    S.creating = false;
+    render();
+  }
+
+  function resumeAsTeacher(code) {
+    code = code.trim().toUpperCase();
+    if (!code) return;
+    S.role = 'teacher';
+    S.code = code;
+    subscribeElection(code);
+    subscribeBallots(code);
+    render();
+  }
+
+  async function updateElection(patch) {
+    if (!S.db || !S.code) return;
+    try {
+      await S.db.doc('elections/' + S.code).update(patch);
+      S.writeError = null;
+    } catch (e) {
+      S.writeError = 'Could not save changes (' + String(e.message || e) + ').';
+      render();
+    }
+  }
+
+  function addCandidate() {
+    const cands = (S.election.candidates || []).slice();
+    cands.push({ id: makeId(), name: '' });
+    updateElection({ candidates: cands });
+  }
+  function removeCandidate(id) {
+    const cands = (S.election.candidates || []).filter(c => c.id !== id);
+    updateElection({ candidates: cands });
+  }
+  function renameCandidate(id, name) {
+    const cands = (S.election.candidates || []).map(c => c.id === id ? { ...c, name } : c);
+    updateElection({ candidates: cands });
+  }
+  function setNumWinners(n) {
+    n = Math.max(1, n);
+    updateElection({ numWinners: n });
+  }
+
+  function startVoting() {
+    const cands = (S.election.candidates || []).filter(c => c.name.trim());
+    if (cands.length < 2) {
+      S.writeError = 'Add at least two named candidates first.';
+      render();
+      return;
+    }
+    if (S.election.numWinners >= cands.length) {
+      S.writeError = 'Number of winners must be less than the number of candidates.';
+      render();
+      return;
+    }
+    updateElection({ candidates: cands, phase: 'voting' });
+  }
+
+  async function closeAndCount() {
+    if (!S.db || !S.code) return;
+    try {
+      const col = S.db.collection('elections/' + S.code + '/ballots');
+      const qsnap = await col.get();
+      const ballots = qsnap.docs.map(d => d.data());
+      const result = computeSTV(S.election.candidates, ballots, S.election.numWinners);
+      await S.db.doc('elections/' + S.code).update({
+        phase: 'results',
+        revealedRound: 0,
+        rounds: result.rounds,
+        quota: result.quota,
+        totalBallots: result.totalBallots,
+        elected: result.elected
+      });
+      S.writeError = null;
+    } catch (e) {
+      S.writeError = 'Could not compute results (' + String(e.message || e) + ').';
+      render();
+    }
+  }
+
+  function nextRound() {
+    const r = (S.election.revealedRound || 0) + 1;
+    updateElection({ revealedRound: Math.min(r, S.election.rounds.length - 1) });
+  }
+  function prevRound() {
+    const r = (S.election.revealedRound || 0) - 1;
+    updateElection({ revealedRound: Math.max(r, 0) });
+  }
+
+  function reopenVoting() {
+    updateElection({ phase: 'voting', revealedRound: -1, rounds: [], elected: [] });
+  }
+
+  // ---------- Student flow ----------
+  async function joinElection(code, name) {
+    code = code.trim().toUpperCase();
+    name = name.trim();
+    S.joinError = null;
+    if (!S.db) { S.joinError = 'Live voting is not available in this view.'; render(); return; }
+    if (!code || !name) { S.joinError = 'Enter a room code and your name.'; render(); return; }
+    try {
+      const snap = await S.db.doc('elections/' + code).get();
+      if (!snap.exists) { S.joinError = 'No election found with that code.'; render(); return; }
+      S.role = 'student';
+      S.code = code;
+      S.studentName = name;
+      let bid = localStorage.getItem(localKeyBallot(code));
+      if (!bid) {
+        bid = makeId();
+        localStorage.setItem(localKeyBallot(code), bid);
+      }
+      S.ballotId = bid;
+      subscribeElection(code);
+      // check existing ballot
+      const bsnap = await S.db.doc('elections/' + code + '/ballots/' + bid).get();
+      if (bsnap.exists) {
+        S.myRanking = bsnap.data().ranking || [];
+        S.submitted = true;
+      }
+      render();
+    } catch (e) {
+      S.joinError = 'Could not join (' + String(e.message || e) + ').';
+      render();
+    }
+  }
+
+  function addToRanking(id) {
+    if (S.myRanking.includes(id)) return;
+    S.myRanking = S.myRanking.concat([id]);
+    render();
+  }
+  function removeFromRanking(id) {
+    S.myRanking = S.myRanking.filter(x => x !== id);
+    render();
+  }
+  function moveRank(id, dir) {
+    const idx = S.myRanking.indexOf(id);
+    const j = idx + dir;
+    if (j < 0 || j >= S.myRanking.length) return;
+    const arr = S.myRanking.slice();
+    [arr[idx], arr[j]] = [arr[j], arr[idx]];
+    S.myRanking = arr;
+    render();
+  }
+
+  async function submitBallot() {
+    if (!S.db || !S.code || !S.ballotId) return;
+    if (S.myRanking.length === 0) {
+      S.submitError = 'Rank at least one candidate.';
+      render();
+      return;
+    }
+    try {
+      await S.db.doc('elections/' + S.code + '/ballots/' + S.ballotId).set({
+        name: S.studentName,
+        ranking: S.myRanking,
+        submittedAt: new Date().toISOString()
+      });
+      S.submitted = true;
+      S.submitError = null;
+    } catch (e) {
+      S.submitError = 'Could not submit (' + String(e.message || e) + '). Check your connection and try again.';
+    }
+    render();
+  }
+
+  function editBallot() {
+    S.submitted = false;
+    render();
+  }
+
+  function leaveToStart() {
+    if (S.unsubElection) S.unsubElection();
+    if (S.unsubBallots) S.unsubBallots();
+    S.role = null; S.code = null; S.election = null; S.ballots = [];
+    S.myRanking = []; S.submitted = false; S.joinError = null; S.writeError = null;
+    render();
+  }
+
+  // ---------- Views ----------
+  function el(tag, attrs, children) {
+    const e = document.createElement(tag);
+    if (attrs) for (const k in attrs) {
+      if (k === 'class') e.className = attrs[k];
+      else if (k.startsWith('on')) e.addEventListener(k.slice(2), attrs[k]);
+      else if (k === 'html') e.innerHTML = attrs[k];
+      else e.setAttribute(k, attrs[k]);
+    }
+    (children || []).forEach(c => { if (c) e.appendChild(c); });
+    return e;
+  }
+  function txt(s) { return document.createTextNode(s); }
+
+  function viewHome() {
+    const c = el('div', {}, []);
+    c.appendChild(el('h1', {}, [txt('Ranked Choice Election')]));
+    c.appendChild(el('p', { class: 'sub' }, [txt('A single transferable vote (STV) simulator for the classroom.')]));
+
+    const teacherPanel = el('div', { class: 'panel' }, [
+      el('h2', {}, [txt("I'm the teacher")]),
+      el('p', { class: 'muted' }, [txt('Set up candidates, open voting, and step through the STV rounds live.')]),
+      el('button', { class: 'primary big', onclick: createElection }, [txt(S.creating ? 'Creating…' : 'Create a new election')])
+    ]);
+    if (S.writeError) teacherPanel.appendChild(el('div', { class: 'warn-box' }, [txt(S.writeError)]));
+
+    const resumeRow = el('div', { class: 'row', style: 'margin-top:10px' });
+    const codeInput = el('input', { type: 'text', placeholder: 'Resume with room code', maxlength: '5', style: 'flex:1' });
+    const resumeBtn = el('button', { onclick: () => resumeAsTeacher(codeInput.value) }, [txt('Resume')]);
+    resumeRow.appendChild(codeInput); resumeRow.appendChild(resumeBtn);
+    teacherPanel.appendChild(resumeRow);
+
+    const studentPanel = el('div', { class: 'panel' }, [
+      el('h2', {}, [txt("I'm a student")]),
+      el('p', { class: 'muted' }, [txt('Enter the room code your teacher shared.')])
+    ]);
+    const codeIn = el('input', { type: 'text', placeholder: 'ROOM CODE', maxlength: '5', style: 'text-transform:uppercase; margin-bottom:8px;' });
+    const nameIn = el('input', { type: 'text', placeholder: 'Your name', style: 'margin-bottom:8px;' });
+    const joinBtn = el('button', { class: 'primary big', onclick: () => joinElection(codeIn.value, nameIn.value) }, [txt('Join')]);
+    studentPanel.appendChild(codeIn); studentPanel.appendChild(nameIn); studentPanel.appendChild(joinBtn);
+    if (S.joinError) studentPanel.appendChild(el('div', { class: 'warn-box', style: 'margin-top:10px' }, [txt(S.joinError)]));
+
+    c.appendChild(teacherPanel);
+    c.appendChild(studentPanel);
+
+    return c;
+  }
+
+  function topbar(title, code, onLeave) {
+    const bar = el('div', { class: 'topbar' });
+    const left = el('div', {}, [
+      el('h1', { style: 'margin-bottom:0' }, [txt(title)]),
+      code ? el('span', { class: 'pill' }, [txt('Room ' + code)]) : null
+    ]);
+    bar.appendChild(left);
+    bar.appendChild(el('button', { class: 'ghost', onclick: onLeave }, [txt('Leave')]));
+    return bar;
+  }
+
+  function viewTeacherLoading() {
+    return el('div', {}, [el('div', { class: 'spinner' }), el('p', { class: 'center muted' }, [txt('Loading election…')])]);
+  }
+
+  function viewTeacherSetup() {
+    const c = el('div', {});
+    c.appendChild(topbar('Set up election', S.code, leaveToStart));
+    const panel = el('div', { class: 'panel' });
+    panel.appendChild(el('div', { class: 'code-badge' }, [txt(S.code)]));
+    panel.appendChild(el('p', { class: 'muted center' }, [txt('Share this code with students to join.')]));
+    c.appendChild(panel);
+
+    const candPanel = el('div', { class: 'panel' });
+    candPanel.appendChild(el('h2', {}, [txt('Candidates')]));
+    (S.election.candidates || []).forEach((cand, i) => {
+      const row = el('div', { class: 'cand-row' });
+      const inp = el('input', { type: 'text', placeholder: 'Candidate name', value: cand.name || '' });
+      inp.addEventListener('change', () => renameCandidate(cand.id, inp.value));
+      row.appendChild(inp);
+      row.appendChild(el('button', { class: 'iconbtn', onclick: () => removeCandidate(cand.id) }, [txt('✕')]));
+      candPanel.appendChild(row);
+    });
+    candPanel.appendChild(el('button', { style: 'margin-top:8px', onclick: addCandidate }, [txt('+ Add candidate')]));
+    c.appendChild(candPanel);
+
+    const winPanel = el('div', { class: 'panel' });
+    winPanel.appendChild(el('h2', {}, [txt('Number of winners (seats)')]));
+    const stepper = el('div', { class: 'stepper' });
+    const n = S.election.numWinners || 1;
+    stepper.appendChild(el('button', { onclick: () => setNumWinners(n - 1) }, [txt('−')]));
+    stepper.appendChild(el('span', { class: 'val' }, [txt(String(n))]));
+    stepper.appendChild(el('button', { onclick: () => setNumWinners(n + 1) }, [txt('+')]));
+    winPanel.appendChild(stepper);
+    c.appendChild(winPanel);
+
+    if (S.writeError) c.appendChild(el('div', { class: 'warn-box' }, [txt(S.writeError)]));
+
+    c.appendChild(el('button', { class: 'primary big', onclick: startVoting }, [txt('Start voting →')]));
+    return c;
+  }
+
+  function viewTeacherVoting() {
+    const c = el('div', {});
+    c.appendChild(topbar('Voting open', S.code, leaveToStart));
+    const panel = el('div', { class: 'panel center' });
+    panel.appendChild(el('div', { class: 'code-badge' }, [txt(S.code)]));
+    panel.appendChild(el('p', { class: 'muted' }, [txt('Students join and rank candidates now.')]));
+    c.appendChild(panel);
+
+    const cands = S.election.candidates || [];
+    const listPanel = el('div', { class: 'panel' });
+    listPanel.appendChild(el('h2', {}, [txt('Candidates (' + cands.length + ') · ' + S.election.numWinners + ' winner(s)')]));
+    cands.forEach(cd => listPanel.appendChild(el('div', { class: 'cand-row' }, [txt(cd.name)])));
+    c.appendChild(listPanel);
+
+    const submitted = S.ballots.length;
+    const votePanel = el('div', { class: 'panel center' });
+    votePanel.appendChild(el('div', { style: 'font-size:2.2rem; font-weight:800;' }, [txt(String(submitted))]));
+    votePanel.appendChild(el('p', { class: 'muted' }, [txt(submitted === 1 ? 'ballot submitted' : 'ballots submitted')]));
+    c.appendChild(votePanel);
+
+    if (S.writeError) c.appendChild(el('div', { class: 'warn-box' }, [txt(S.writeError)]));
+    c.appendChild(el('button', { class: 'primary big', onclick: closeAndCount }, [txt('Close voting & count →')]));
+    return c;
+  }
+
+  function tallyBar(id, name, votes, quota, max, status) {
+    const wrap = el('div', { class: 'bar-row' });
+    const pct = max > 0 ? Math.min(100, (votes / max) * 100) : 0;
+    wrap.appendChild(el('div', { class: 'bar-label' }, [
+      txt(name + (status === 'elected' ? '  ✓ elected' : status === 'eliminated' ? '  ✕ eliminated' : '')),
+      txt(votes.toFixed(2))
+    ]));
+    const track = el('div', { class: 'bar-track' });
+    track.appendChild(el('div', { class: 'bar-fill' + (status === 'elected' ? ' elected' : status === 'eliminated' ? ' eliminated' : ''), style: 'width:' + pct + '%' }));
+    wrap.appendChild(track);
+    return wrap;
+  }
+
+  function roundView(round, index, quota, names) {
+    const box = el('div', {});
+    box.appendChild(el('h2', {}, [txt('Round ' + (index + 1))]));
+    const maxVal = Math.max(quota, ...Object.values(round.tally));
+    // order by votes desc
+    const entries = Object.keys(round.tally).map(id => ({ id, v: round.tally[id] })).sort((a, b) => b.v - a.v);
+    entries.forEach(e2 => {
+      let status = null;
+      if (round.type === 'elect' && e2.id === round.winner) status = 'elected';
+      if (round.type === 'eliminate' && e2.id === round.loser) status = 'eliminated';
+      if (round.type === 'electremaining' && round.elected.includes(e2.id)) status = 'elected';
+      box.appendChild(tallyBar(e2.id, names[e2.id] || e2.id, e2.v, quota, maxVal, status));
+    });
+    box.appendChild(el('div', { class: 'quota-line' }, [txt('Quota to win: ' + quota + (round.exhausted ? '  ·  exhausted votes: ' + round.exhausted.toFixed(2) : ''))]));
+
+    if (round.type === 'elect') {
+      box.appendChild(el('div', { class: 'round-note elect' }, [
+        txt(names[round.winner] + ' passed the quota with ' + round.votes.toFixed(2) + ' votes. Surplus of ' +
+          round.surplus.toFixed(2) + ' votes transfers to next choices at ' + (round.transferValue * 100).toFixed(1) + '% value.')
+      ]));
+    } else if (round.type === 'eliminate') {
+      box.appendChild(el('div', { class: 'round-note eliminate' }, [
+        txt(names[round.loser] + ' had the fewest votes (' + round.votes.toFixed(2) + ') and is eliminated. Their votes transfer to next choices.')
+      ]));
+    } else if (round.type === 'electremaining') {
+      box.appendChild(el('div', { class: 'round-note elect' }, [
+        txt('Remaining seats fill with the remaining candidates: ' + round.elected.map(id => names[id]).join(', ') + '.')
+      ]));
+    }
+    return box;
+  }
+
+  function viewResults(isTeacher) {
+    const c = el('div', {});
+    c.appendChild(topbar('Results', S.code, leaveToStart));
+    const rounds = S.election.rounds || [];
+    const revealed = Math.max(0, S.election.revealedRound || 0);
+    const names = {};
+    (S.election.candidates || []).forEach(cd => names[cd.id] = cd.name);
+
+    const panel = el('div', { class: 'panel' });
+    if (rounds.length === 0) {
+      panel.appendChild(el('p', {}, [txt('Computing…')]));
+    } else {
+      panel.appendChild(roundView(rounds[revealed], revealed, S.election.quota, names));
+    }
+    c.appendChild(panel);
+
+    if (isTeacher && rounds.length) {
+      const nav = el('div', { class: 'footer-nav' });
+      nav.appendChild(el('button', { onclick: prevRound, disabled: revealed === 0 ? 'true' : null }, [txt('← Previous round')]));
+      if (revealed < rounds.length - 1) {
+        nav.appendChild(el('button', { class: 'primary', onclick: nextRound }, [txt('Next round →')]));
+      } else {
+        nav.appendChild(el('span', { class: 'pill' }, [txt('Final round')]));
+      }
+      c.appendChild(nav);
+    }
+
+    if (revealed === rounds.length - 1 && rounds.length) {
+      const winPanel = el('div', { class: 'panel' });
+      winPanel.appendChild(el('h2', {}, [txt('🏆 Elected')]));
+      const ul = el('ul', { class: 'winners-list' });
+      (S.election.elected || []).forEach(id => ul.appendChild(el('li', {}, [txt(names[id] || id)])));
+      winPanel.appendChild(ul);
+      c.appendChild(winPanel);
+    }
+
+    if (isTeacher) {
+      c.appendChild(el('button', { class: 'ghost big', style: 'margin-top:10px', onclick: reopenVoting }, [txt('Reopen voting (redo)')]));
+    } else {
+      c.appendChild(el('p', { class: 'muted center', style: 'margin-top:10px' }, [txt('Your teacher is revealing the rounds — this updates automatically.')]));
+    }
+    return c;
+  }
+
+  function viewTeacher() {
+    if (!S.election) return viewTeacherLoading();
+    if (S.election.phase === 'setup') return viewTeacherSetup();
+    if (S.election.phase === 'voting') return viewTeacherVoting();
+    return viewResults(true);
+  }
+
+  function viewStudentJoinWait() {
+    const c = el('div', {});
+    c.appendChild(topbar('Waiting…', S.code, leaveToStart));
+    c.appendChild(el('div', { class: 'panel center' }, [
+      el('div', { class: 'spinner' }),
+      el('p', { class: 'muted' }, [txt('Waiting for the teacher to start voting.')])
+    ]));
+    return c;
+  }
+
+  function viewStudentBallot() {
+    const c = el('div', {});
+    c.appendChild(topbar('Rank your choices', S.code, leaveToStart));
+    const cands = S.election.candidates || [];
+    const remaining = cands.filter(cd => !S.myRanking.includes(cd.id));
+
+    const rankPanel = el('div', { class: 'panel' });
+    rankPanel.appendChild(el('h2', {}, [txt('Your ranking (' + S.myRanking.length + ')')]));
+    if (S.myRanking.length === 0) {
+      rankPanel.appendChild(el('p', { class: 'muted' }, [txt('Tap candidates below to add them, in order of preference.')]));
+    }
+    S.myRanking.forEach((id, i) => {
+      const cd = cands.find(x => x.id === id);
+      const row = el('div', { class: 'rank-item' });
+      row.appendChild(el('div', { class: 'rank-num' }, [txt(String(i + 1))]));
+      row.appendChild(el('div', { class: 'name' }, [txt(cd ? cd.name : '?')]));
+      row.appendChild(el('button', { class: 'iconbtn', onclick: () => moveRank(id, -1) }, [txt('↑')]));
+      row.appendChild(el('button', { class: 'iconbtn', onclick: () => moveRank(id, 1) }, [txt('↓')]));
+      row.appendChild(el('button', { class: 'iconbtn', onclick: () => removeFromRanking(id) }, [txt('✕')]));
+      rankPanel.appendChild(row);
+    });
+    c.appendChild(rankPanel);
+
+    if (remaining.length) {
+      const poolPanel = el('div', { class: 'panel' });
+      poolPanel.appendChild(el('h2', {}, [txt('Candidates')]));
+      remaining.forEach(cd => {
+        poolPanel.appendChild(el('button', { class: 'cand-pool-btn', onclick: () => addToRanking(cd.id) }, [txt('+ ' + cd.name)]));
+      });
+      c.appendChild(poolPanel);
+    }
+
+    if (S.submitError) c.appendChild(el('div', { class: 'warn-box' }, [txt(S.submitError)]));
+    c.appendChild(el('button', { class: 'primary big', onclick: submitBallot }, [txt('Submit ballot')]));
+    c.appendChild(el('p', { class: 'muted center', style: 'margin-top:8px' }, [txt('You can rank as many or as few candidates as you like, in order.')]));
+    return c;
+  }
+
+  function viewStudentSubmitted() {
+    const c = el('div', {});
+    c.appendChild(topbar('Ballot submitted', S.code, leaveToStart));
+    c.appendChild(el('div', { class: 'panel center' }, [
+      el('div', { style: 'font-size:2.4rem' }, [txt('✓')]),
+      el('p', {}, [txt('Your ranked ballot is in.')]),
+      el('button', { class: 'ghost', onclick: editBallot }, [txt('Edit my ranking')])
+    ]));
+    c.appendChild(el('p', { class: 'muted center' }, [txt('Waiting for the teacher to close voting…')]));
+    return c;
+  }
+
+  function viewStudent() {
+    if (!S.election) return viewTeacherLoading();
+    if (S.election.phase === 'setup') return viewStudentJoinWait();
+    if (S.election.phase === 'voting') {
+      return S.submitted ? viewStudentSubmitted() : viewStudentBallot();
+    }
+    return viewResults(false);
+  }
+
+  function App() {
+    const root = document.getElementById('app');
+    root.innerHTML = '';
+    let view;
+    if (!S.dbReady) {
+      view = el('div', { class: 'center', style: 'padding-top:60px' }, [el('div', { class: 'spinner' })]);
+    } else if (!S.role) {
+      view = viewHome();
+    } else if (S.role === 'teacher') {
+      view = viewTeacher();
+    } else {
+      view = viewStudent();
+    }
+    root.appendChild(view);
+  }
+
+  setupCapabilities();
+  render();
+})();
+</script>
+</body>
+</html>
